@@ -120,9 +120,7 @@ if (!document.createElement('canvas').getContext) {
         ss.owningElement.id = 'ex_canvas_';
         ss.cssText = 'canvas{display:inline-block;overflow:hidden;' +
             // default size is 300x150 in Gecko and Opera
-            'text-align:left;width:300px;height:150px}' +
-            'g_vml_\\:*{behavior:url(#default#VML)}' +
-            'g_o_\\:*{behavior:url(#default#VML)}';
+            'text-align:left;width:300px;height:150px}';
       }
 
       // find all canvas elements
@@ -416,6 +414,10 @@ if (!document.createElement('canvas').getContext) {
 
   var contextPrototype = CanvasRenderingContext2D_.prototype;
   contextPrototype.clearRect = function() {
+    if (this.textMeasureEl_) {
+      this.textMeasureEl_.removeNode(true);
+      this.textMeasureEl_ = null;
+    }
     this.element_.innerHTML = '';
   }
 
@@ -1010,8 +1012,6 @@ if (!document.createElement('canvas').getContext) {
         lineStr = [],
         style = '';
 
-    console.info(this.font)
-
     if (lineWidth < 1) opacity *= lineWidth;
 
     var elementStyle = this.element_.currentStyle,
@@ -1096,18 +1096,19 @@ if (!document.createElement('canvas').getContext) {
   };
 
   contextPrototype.measureText = function(text) {
-    if (!this.dummyDiv_) {
+    if (!this.textMeasureEl_) {
       // We should also parse the font style, as it is done in the drawing methods
-      var dummyDiv = '<div style="position:absolute;display:inline;' +
-          'top:-20000;left:0;padding:0;margin:0;border:none;' +
-          'white-space:nowrap;font:' + this.font + '"></div>';
-      this.element_.insertAdjacentHTML('beforeEnd', dummyDiv);
-      this.dummyDiv_ = this.element_.lastChild;
+      var s = '<span style="position:absolute;' +
+          'top:-20000px;left:0;padding:0;margin:0;border:none;' +
+          'white-space:pre;font:' + this.font + '"></span>';
+      this.element_.insertAdjacentHTML('beforeEnd', s);
+      this.textMeasureEl_ = this.element_.lastChild;
     }
     var doc = this.element_.ownerDocument;
-    this.dummyDiv_.innerHTML = '';
-    this.dummyDiv_.appendChild(doc.createTextNode(text))
-    return {width: this.dummyDiv_.offsetWidth};
+    this.textMeasureEl_.innerHTML = '';
+    // Don't use innerHTML or innerText because they allow markup/whitespace.
+    this.textMeasureEl_.appendChild(doc.createTextNode(text));
+    return {width: this.textMeasureEl_.offsetWidth};
   };
 
   /******** STUBS ********/
