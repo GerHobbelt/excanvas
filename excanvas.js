@@ -118,7 +118,15 @@ if (!document.createElement('canvas').getContext) {
       // Create a dummy element so that IE will allow canvas elements to be
       // recognized.
       doc.createElement('canvas');
-      doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
+      /*
+       * When lazy loading excanvas.js, the onreadystatechange event is never fired
+       * because doc.readyState already reports "complete".
+       */
+      if(doc.readyState !== "complete"){
+        doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
+      } else {
+        this.init_(doc);
+      }
     },
 
     init_: function(doc) {
@@ -173,23 +181,23 @@ if (!document.createElement('canvas').getContext) {
       return el;
     },
 
-	/*
-	Release canvas node to prevent memory leaks (issue #82 - http://code.google.com/p/explorercanvas/issues/detail?id=82).
+    /*
+    Release canvas node to prevent memory leaks (issue #82 - http://code.google.com/p/explorercanvas/issues/detail?id=82).
 
-	This method should be called manually before destroying your reference(s) to the excanvas object.
-	*/
-	uninitElement: function(el) {
+    This method should be called manually before destroying your reference(s) to the excanvas object.
+    */
+    uninitElement: function(el) {
       if (el.getContext) {
-		var ctx = el.getContext();
-		delete ctx.element_;
-		delete ctx.canvas;
-		el.innerHTML = "";
-		el.context_ = null;
-		el.getContext = null;
-		el.detachEvent("onpropertychange", onPropertyChange);
-		el.detachEvent("onresize", onResize);
-	  }
-	}
+        var ctx = el.getContext();
+        delete ctx.element_;
+        delete ctx.canvas;
+        el.innerHTML = "";
+        el.context_ = null;
+        el.getContext = null;
+        el.detachEvent("onpropertychange", onPropertyChange);
+        el.detachEvent("onresize", onResize);
+      }
+    }
   };
 
   function onPropertyChange(e) {
