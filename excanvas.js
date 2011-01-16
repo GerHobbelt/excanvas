@@ -171,7 +171,25 @@ if (!document.createElement('canvas').getContext) {
         //el.getContext().setCoordsize_()
       }
       return el;
-    }
+    },
+
+	/*
+	Release canvas node to prevent memory leaks (issue #82 - http://code.google.com/p/explorercanvas/issues/detail?id=82).
+
+	This method should be called manually before destroying your reference(s) to the excanvas object.
+	*/
+	uninitElement: function(el) {
+      if (el.getContext) {
+		var ctx = el.getContext();
+		delete ctx.element_;
+		delete ctx.canvas;
+		el.innerHTML = "";
+		el.context_ = null;
+		el.getContext = null;
+		el.detachEvent("onpropertychange", onPropertyChange);
+		el.detachEvent("onresize", onResize);
+	  }
+	}
   };
 
   function onPropertyChange(e) {
