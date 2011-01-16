@@ -58,5 +58,4 @@ Follow either of the two links above to access the appropriate CLA and instructi
 _Copyright 2008 Google Inc._
 _This work is licensed under a_
 [Creative Commons Attribution 2.5 License](http://soc.googlecode.com/svn/wiki/html/licenses/cc-by-attribution-2_5.html).
-![CC 2.5](http://soc.googlecode.com/svn/wiki/html/licenses/cc-by-2_5-88x31.png)
 [CC 2.5](http://creativecommons.org/licenses/by/2.5/)
