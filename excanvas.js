@@ -560,6 +560,47 @@ if (!document.createElement('canvas').getContext) {
     return lineCapMap[lineCap] || 'square';
   }
 
+  // used by draw timer
+  var drawDelay = 1000 / 30;  //30 "renders" a second, on average.
+
+  /**
+   * Add a block of VML to the scene. This VML will be added at some point in the future,but after this call completes.
+   * @param ctx CanvasRenderingContext2D_ object.
+   * @param vmlStr VML to add.
+   */
+  function insertVML(ctx, vmlStr) {
+    ctx.vmlList_.push(vmlStr);
+    startDrawTimer(ctx);
+  }
+
+  //Called exclusively by insertVML.
+  function startDrawTimer(ctx) {
+    if (!ctx.drawScheduled_) {
+      ctx.drawScheduled_ = true;
+      var timer = function () {
+        drawTimerFired(ctx);
+      };
+      var now = new Date().getTime();
+      var delay = clamp(drawDelay - (now - ctx.lastDrawn_), 1, drawDelay);
+      setTimeout(timer, delay);
+    }
+  }
+
+  //Called exclusively by the Draw timer.
+  function drawTimerFired(ctx) {
+    ctx.lastDrawn_ = new Date().getTime();
+    var vml = '';
+    if (ctx.vmlList_.length > 0) {
+      vml = ctx.vmlList_.join('\n');
+    }
+    if (ctx.textMeasureEl_) {
+      ctx.textMeasureEl_.removeNode(true);
+      ctx.textMeasureEl_ = null;
+    }
+    ctx.element_.innerHTML = vml;
+    ctx.drawScheduled_ = false;
+  }
+
   /**
    * This class implements CanvasRenderingContext2D interface as described by
    * the WHATWG.
@@ -572,6 +613,11 @@ if (!document.createElement('canvas').getContext) {
     this.mStack_ = [];
     this.aStack_ = [];
     this.currentPath_ = [];
+
+    //Draw timer properties
+    this.drawScheduled_ = false;
+    this.lastDrawn_ = 0;
+    this.vmlList_ = [];
 
     // Canvas context properties
     this.strokeStyle = '#000';
@@ -611,7 +657,8 @@ if (!document.createElement('canvas').getContext) {
       this.textMeasureEl_.removeNode(true);
       this.textMeasureEl_ = null;
     }
-    this.element_.innerHTML = '';
+    this.vmlList_ = [];
+    startDrawTimer(this);
   };
 
   contextPrototype.beginPath = function() {
@@ -873,7 +920,7 @@ if (!document.createElement('canvas').getContext) {
                 ' />',
                 '</g_vml_:group>');
 
-    this.element_.insertAdjacentHTML('BeforeEnd', vmlStr.join(''));
+    insertVML(this, vmlStr.join(''));
   };
 
   contextPrototype.stroke = function(aFill) {
@@ -960,7 +1007,7 @@ if (!document.createElement('canvas').getContext) {
 
     lineStr.push('</g_vml_:shape>');
 
-    this.element_.insertAdjacentHTML('beforeEnd', lineStr.join(''));
+    insertVML(this, lineStr.join(''));
   };
 
   function appendStroke(ctx, lineStr) {
@@ -1288,7 +1335,7 @@ if (!document.createElement('canvas').getContext) {
                  ';font:', encodeHtmlAttribute(fontStyleString),
                  '" /></g_vml_:line>');
 
-    this.element_.insertAdjacentHTML('beforeEnd', lineStr.join(''));
+    insertVML(this, lineStr.join(''));
   };
 
   contextPrototype.fillText = function(text, x, y, maxWidth) {
