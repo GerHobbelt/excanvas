@@ -90,7 +90,29 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function addNamespace(doc, prefix, urn) {
-    if (!doc.namespaces[prefix]) {
+	/*
+    //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+    //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+
+	official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
+
+	item(): iIndex	Required. Integer that specifies the zero-based index of the item to be returned.
+
+	WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
+	*/
+	var i;
+	var found = 0;
+	for (i = 0; i < doc.namespaces.length; i++)
+	{
+		var nsi = doc.namespaces.item(i);
+		if (nsi.name == prefix)
+		{
+			found = 1;
+			break;
+		}
+	}
+    if (!found)
+	{
       doc.namespaces.add(prefix, urn, '#default#VML');
     }
   }
