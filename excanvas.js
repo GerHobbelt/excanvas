@@ -90,7 +90,29 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function addNamespace(doc, prefix, urn) {
-    if (!doc.namespaces[prefix]) {
+	/*
+    //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+    //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+
+	official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
+
+	item(): iIndex	Required. Integer that specifies the zero-based index of the item to be returned.
+
+	WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
+	*/
+	var i;
+	var found = 0;
+	for (i = 0; i < doc.namespaces.length; i++)
+	{
+		var nsi = doc.namespaces.item(i);
+		if (nsi.name == prefix)
+		{
+			found = 1;
+			break;
+		}
+	}
+    if (!found)
+	{
       doc.namespaces.add(prefix, urn, '#default#VML');
     }
   }
@@ -118,7 +140,15 @@ if (!document.createElement('canvas').getContext) {
       // Create a dummy element so that IE will allow canvas elements to be
       // recognized.
       doc.createElement('canvas');
-      doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
+      /*
+       * When lazy loading excanvas.js, the onreadystatechange event is never fired
+       * because doc.readyState already reports "complete".
+       */
+      if(doc.readyState !== "complete"){
+        doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
+      } else {
+        this.init_(doc);
+      }
     },
 
     init_: function(doc) {
@@ -171,6 +201,24 @@ if (!document.createElement('canvas').getContext) {
         //el.getContext().setCoordsize_()
       }
       return el;
+    },
+
+    /*
+    Release canvas node to prevent memory leaks (issue #82 - http://code.google.com/p/explorercanvas/issues/detail?id=82).
+
+    This method should be called manually before destroying your reference(s) to the excanvas object.
+    */
+    uninitElement: function(el) {
+      if (el.getContext) {
+        var ctx = el.getContext();
+        delete ctx.element_;
+        delete ctx.canvas;
+        el.innerHTML = "";
+        el.context_ = null;
+        el.getContext = null;
+        el.detachEvent("onpropertychange", onPropertyChange);
+        el.detachEvent("onresize", onResize);
+      }
     }
   };
 
@@ -657,7 +705,12 @@ if (!document.createElement('canvas').getContext) {
       this.textMeasureEl_.removeNode(true);
       this.textMeasureEl_ = null;
     }
+
     this.vmlList_ = [];
+    this.mStack_ = [];
+    this.aStack_ = [];
+    this.currentPath_ = [];
+
     startDrawTimer(this);
   };
 
@@ -754,7 +807,6 @@ if (!document.createElement('canvas').getContext) {
                            yStart: pStart.y,
                            xEnd: pEnd.x,
                            yEnd: pEnd.y});
-
   };
 
   contextPrototype.rect = function(aX, aY, aWidth, aHeight) {
