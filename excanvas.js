@@ -638,6 +638,10 @@ if (!document.createElement('canvas').getContext) {
       this.textMeasureEl_ = null;
     }
     this.element_.innerHTML = '';
+
+    this.mStack_ = [];
+    this.aStack_ = [];
+    this.currentPath_ = [];
   };
 
   contextPrototype.beginPath = function() {
@@ -733,7 +737,6 @@ if (!document.createElement('canvas').getContext) {
                            yStart: pStart.y,
                            xEnd: pEnd.x,
                            yEnd: pEnd.y});
-
   };
 
   contextPrototype.rect = function(aX, aY, aWidth, aHeight) {
