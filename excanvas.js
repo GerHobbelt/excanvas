@@ -89,7 +89,51 @@ if (!document.createElement('canvas').getContext) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   }
 
+  addcallcount = 0;
   function addNamespace(doc, prefix, urn) {
+	/*
+	IE8 (v8.0.7600.16385 Win7/64) sometimes doesn't have the document.namespaces Object initialized by the time we get here.
+
+	Of course we depend on those namespaces being added, but we need to give the browser time and the ability to continue what it
+	was doing, so we can only use setTimeout() to wait until it is indeed ready.
+
+	This happens despite the lazy-loading of this javascript code; probably because the lazyloader starts before the
+	document has been parsed completely in IE8 (THIS IS A HUNCH; i DO NOT HAVE EVIDENCE FOR THIS JUST YET!)
+	*/
+	var nst = typeof(doc.namespaces);
+	var nso;
+	if (nst == 'object')
+	{
+		nso = typeof(doc.namespaces.item);
+		if (nso == 'string')
+		{
+			nso = doc.namespaces.item; // "[object HTMLNamespaceInfoCollection]"
+			var cln = nso.match(/\[object\s*(\w+)\]/);
+			if (cln && cln.length == 2)
+			{
+				nso = cln[1];
+			}
+		}
+	}
+	if (nst != 'object' && nso != 'HTMLNamespaceInfoCollection')
+	{
+		var t = setTimeout(function(){
+			if (addcallcount % 50 == 49)
+			{
+				alert('failed to init namespaces in EXCANVAS: ' + addcallcount);
+				return; // fail
+			}
+			addNamespace(doc, prefix, urn);
+			addcallcount++;
+		}, 20);
+		//alert('ns: ' + typeof(doc.namespaces));
+		//alert('nslen: ' + doc.namespaces.length);
+		return;
+	}
+	else
+	{
+		//alert('final: ' + addcallcount + ', ' + nso);
+	}
 	/*
     //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
     //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
