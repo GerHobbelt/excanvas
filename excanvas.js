@@ -727,8 +727,15 @@ if (!document.createElement('canvas').getContext) {
     this.currentY_ = p.y;
   };
 
+  // http://code.google.com/p/explorercanvas/issues/detail?id=94
+  function ensureSubpath(self, aX, aY) {
+    if(0 === self.currentPath_.length)
+      self.moveTo(aX, aY);
+  }
+
   contextPrototype.lineTo = function(aX, aY) {
     var p = getCoords(this, aX, aY);
+    ensureSubpath(this, aX, aY);
     this.currentPath_.push({type: 'lineTo', x: p.x, y: p.y});
 
     this.currentX_ = p.x;
@@ -741,6 +748,7 @@ if (!document.createElement('canvas').getContext) {
     var p = getCoords(this, aX, aY);
     var cp1 = getCoords(this, aCP1x, aCP1y);
     var cp2 = getCoords(this, aCP2x, aCP2y);
+    ensureSubpath(this, aCP1x, aCP1y);
     bezierCurveTo(this, cp1, cp2, p);
   };
 
@@ -775,6 +783,7 @@ if (!document.createElement('canvas').getContext) {
       y: cp1.y + (p.y - this.currentY_) / 3.0
     };
 
+    ensureSubpath(this, aCPx, aCPy);
     bezierCurveTo(this, cp1, cp2, p);
   };
 
