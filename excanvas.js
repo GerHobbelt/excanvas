@@ -578,6 +578,9 @@ if (!document.createElement('canvas').getContext) {
     // trial and error to get the same size as non VML text.
     computedStyle.size *= 0.981;
 
+    // Fix for VML handling of bare font family names.  Add a '' around font family names.
+    computedStyle.family =  "'" + computedStyle.family.replace(/(\'|\")/g,'').replace(/\s*,\s*/g, "', '") + "'";
+
     return computedStyle;
   }
 
@@ -1353,8 +1356,7 @@ if (!document.createElement('canvas').getContext) {
         offset = {x: 0, y: 0},
         lineStr = [];
 
-    var fontStyle = getComputedStyle(processFontStyle(this.font),
-                                     this.element_);
+    var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_);
 
     var fontStyleString = buildStyle(fontStyle);
 
@@ -1420,7 +1422,7 @@ if (!document.createElement('canvas').getContext) {
     var skewM = m[0][0].toFixed(3) + ',' + m[1][0].toFixed(3) + ',' +
                 m[0][1].toFixed(3) + ',' + m[1][1].toFixed(3) + ',0,0';
 
-    var skewOffset = mr(d.x / Z) + ',' + mr(d.y / Z);
+    var skewOffset = mr(d.x / Z + 1 - m[0][0]) + ',' + mr(d.y / Z - 2 * m[1][0]);
 
     lineStr.push('<g_vml_:skew on="t" matrix="', skewM ,'" ',
                  ' offset="', skewOffset, '" origin="', left ,' 0" />',
@@ -1502,7 +1504,7 @@ if (!document.createElement('canvas').getContext) {
       case null:
       case '':
         this.repetition_ = 'repeat';
-        break
+        break;
       case 'repeat-x':
       case 'repeat-y':
       case 'no-repeat':
@@ -1559,6 +1561,9 @@ if (!document.createElement('canvas').getContext) {
   CanvasGradient = CanvasGradient_;
   CanvasPattern = CanvasPattern_;
   DOMException = DOMException_;
+  // Additional info for jqPlot
+  // https://bitbucket.org/cleonello/jqplot/diff/src/excanvas.js?diff1=f289920f4d4f&diff2=b233cdeb2e574e323dacd7e54eb379d20aeb3811&at=default
+  G_vmlCanvasManager._version = 888;
 })();
 
 } // if
