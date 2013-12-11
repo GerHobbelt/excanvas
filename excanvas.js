@@ -48,8 +48,6 @@ if (!document.createElement('canvas').getContext) {
   var Z = 10;
   var Z2 = Z / 2;
 
-  var IE_VERSION = +navigator.userAgent.match(/MSIE ([\d.]+)?/)[1];
-
   /**
    * This funtion is assigned to the <canvas> elements as element.getContext().
    * @this {HTMLElement}
@@ -100,21 +98,16 @@ if (!document.createElement('canvas').getContext) {
 
 	WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
 	*/
-	var i;
-	var found = 0;
-	for (i = 0; i < doc.namespaces.length; i++)
+
+	for (var i = 0, l = doc.namespaces.length; i < l; ++i)
 	{
 		var nsi = doc.namespaces.item(i);
 		if (nsi.name == prefix)
 		{
-			found = 1;
-			break;
+			return;
 		}
 	}
-    if (!found)
-	{
-      doc.namespaces.add(prefix, urn, '#default#VML');
-    }
+      	doc.namespaces.add(prefix, urn, '#default#VML');
   }
 
   function addNamespacesAndStylesheet(doc) {
@@ -154,7 +147,7 @@ if (!document.createElement('canvas').getContext) {
     init_: function(doc) {
       // find all canvas elements
       var els = doc.getElementsByTagName('canvas');
-      for (var i = 0; i < els.length; i++) {
+      for (var i = 0, l = els.length; i < l; ++i) {
         this.initElement(els[i]);
       }
     },
@@ -267,20 +260,11 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function matrixMultiply(m1, m2) {
-    var result = createMatrixIdentity();
-
-    for (var x = 0; x < 3; x++) {
-      for (var y = 0; y < 3; y++) {
-        var sum = 0;
-
-        for (var z = 0; z < 3; z++) {
-          sum += m1[x][z] * m2[z][y];
-        }
-
-        result[x][y] = sum;
-      }
-    }
-    return result;
+    return [
+      [m1[0][0] * m2[0][0] + m1[0][1] * m2[1][0] + m1[0][2] * m2[2][0], m1[0][0] * m2[0][1] + m1[0][1] * m2[1][1] + m1[0][2] * m2[2][1], m1[0][0] * m2[0][2] + m1[0][1] * m2[1][2] + m1[0][2] * m2[2][2]],
+      [m1[1][0] * m2[0][0] + m1[1][1] * m2[1][0] + m1[1][2] * m2[2][0], m1[1][0] * m2[0][1] + m1[1][1] * m2[1][1] + m1[1][2] * m2[2][1], m1[1][0] * m2[0][2] + m1[1][1] * m2[1][2] + m1[1][2] * m2[2][2]],
+      [m1[2][0] * m2[0][0] + m1[2][1] * m2[1][0] + m1[2][2] * m2[2][0], m1[2][0] * m2[0][1] + m1[2][1] * m2[1][1] + m1[2][2] * m2[2][1], m1[2][0] * m2[0][2] + m1[2][1] * m2[1][2] + m1[2][2] * m2[2][2]]
+    ];
   }
 
   function copyState(o1, o2) {
@@ -454,7 +438,7 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function clamp(v, min, max) {
-    return Math.min(max, Math.max(min, v));
+    return v < min ? min : v > max ? max : v; 
   }
 
   function hslToRgb(parts){
