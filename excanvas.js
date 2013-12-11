@@ -31,6 +31,8 @@
 // * Non uniform scaling does not correctly scale strokes.
 // * Optimize. There is always room for speed improvements.
 
+// Patched (manually) using "Sencha patch": http://dev.sencha.com/playpen/tm/excanvas-patch/
+
 // Only add this code if we do not already have a canvas implementation
 if (!document.createElement('canvas').getContext) {
 
@@ -88,26 +90,26 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function addNamespace(doc, prefix, urn) {
-	/*
+  /*
     //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
     //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
 
-	official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
+  official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
 
-	item(): iIndex	Required. Integer that specifies the zero-based index of the item to be returned.
+  item(): iIndex  Required. Integer that specifies the zero-based index of the item to be returned.
 
-	WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
-	*/
+  WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
+  */
 
-	for (var i = 0, l = doc.namespaces.length; i < l; ++i)
-	{
-		var nsi = doc.namespaces.item(i);
-		if (nsi.name == prefix)
-		{
-			return;
-		}
-	}
-      	doc.namespaces.add(prefix, urn, '#default#VML');
+  for (var i = 0, l = doc.namespaces.length; i < l; ++i)
+  {
+    var nsi = doc.namespaces.item(i);
+    if (nsi.name == prefix)
+    {
+      return;
+    }
+  }
+        doc.namespaces.add(prefix, urn, '#default#VML');
   }
 
   function addNamespacesAndStylesheet(doc) {
@@ -285,6 +287,7 @@ if (!document.createElement('canvas').getContext) {
     o2.arcScaleX_    = o1.arcScaleX_;
     o2.arcScaleY_    = o1.arcScaleY_;
     o2.lineScale_    = o1.lineScale_;
+    o2.rotation_     = o1.rotation_; // used for images (sencha-patch)
   }
 
   var colorData = {
@@ -681,6 +684,7 @@ if (!document.createElement('canvas').getContext) {
     this.arcScaleX_ = 1;
     this.arcScaleY_ = 1;
     this.lineScale_ = 1;
+    this.rotation_ = 0; // sencha-patch
   }
 
   var contextPrototype = CanvasRenderingContext2D_.prototype;
@@ -862,19 +866,26 @@ if (!document.createElement('canvas').getContext) {
   contextPrototype.drawImage = function(image, var_args) {
     var dx, dy, dw, dh, sx, sy, sw, sh;
 
-    // to find the original width we overide the width and height
-    var oldRuntimeWidth = image.runtimeStyle.width;
-    var oldRuntimeHeight = image.runtimeStyle.height;
-    image.runtimeStyle.width = 'auto';
-    image.runtimeStyle.height = 'auto';
+    // to fix new Image() we check the existance of runtimeStyle (sencha-patch)
+    var rts = image.runtimeStyle.width;
+    
+    if (rts) { // sencha-patch
+      // to find the original width we overide the width and height
+      var oldRuntimeWidth = image.runtimeStyle.width;
+      var oldRuntimeHeight = image.runtimeStyle.height;
+      image.runtimeStyle.width = 'auto';
+      image.runtimeStyle.height = 'auto';
+    }
 
     // get the original size
     var w = image.width;
     var h = image.height;
 
-    // and remove overides
-    image.runtimeStyle.width = oldRuntimeWidth;
-    image.runtimeStyle.height = oldRuntimeHeight;
+    if(rts) { // sencha patch
+      // and remove overides
+      image.runtimeStyle.width = oldRuntimeWidth;
+      image.runtimeStyle.height = oldRuntimeHeight;
+    }
 
     if (arguments.length == 3) {
       dx = arguments[1];
@@ -913,11 +924,10 @@ if (!document.createElement('canvas').getContext) {
     var W = 10;
     var H = 10;
 
-    // For some reason that I've now forgotten, using divs didn't work
-    vmlStr.push(' <g_vml_:group',
-                ' coordsize="', Z * W, ',', Z * H, '"',
-                ' coordorigin="0,0"' ,
-                ' style="width:', W, 'px;height:', H, 'px;position:absolute;');
+    var scaleX = scaleY = 1;
+        
+    // FIX: divs give better quality then vml image and also fixes transparent PNG's
+    vmlStr.push(' <div style="position:absolute;');
 
     // If filters are necessary (rotation exists), create them
     // filters are bog-slow, so only create them if abbsolutely necessary
@@ -928,13 +938,30 @@ if (!document.createElement('canvas').getContext) {
         this.m_[1][1] != 1 || this.m_[1][0]) {
       var filter = [];
 
-      // Note the 12/21 reversal
-      filter.push('M11=', this.m_[0][0], ',',
-                  'M12=', this.m_[1][0], ',',
-                  'M21=', this.m_[0][1], ',',
-                  'M22=', this.m_[1][1], ',',
-                  'Dx=', mr(d.x / Z), ',',
-                  'Dy=', mr(d.y / Z), '');
+      // Scaling images using width & height instead of Transform Matrix
+      // because of quality loss
+      var c = mc(this.rotation_);        
+      var s = ms(this.rotation_);
+      
+      // Inverse rotation matrix
+      var irm = [
+        [c,  -s, 0],
+        [s, c, 0],
+        [0,  0, 1]
+      ];        
+        
+      // Get unrotated matrix to get only scaling values
+      var urm = matrixMultiply(irm, this.m_);          
+      scaleX = urm[0][0];
+      scaleY = urm[1][1];
+    
+      // Apply only rotation and translation to Matrix
+      filter.push('M11=', c, ',',
+                  'M12=', -s, ',',
+                  'M21=', s, ',',
+                  'M22=', c, ',',
+                  'Dx=', d.x / Z, ',',
+                  'Dy=', d.y / Z);
 
       // Bounding box calculation (need to minimize displayed area so that
       // filters don't waste time on unused pixels.
@@ -954,16 +981,38 @@ if (!document.createElement('canvas').getContext) {
       vmlStr.push('top:', mr(d.y / Z), 'px;left:', mr(d.x / Z), 'px;');
     }
 
-    vmlStr.push(' ">' ,
-                '<g_vml_:image src="', image.src, '"',
-                ' style="width:', Z * dw, 'px;',
-                ' height:', Z * dh, 'px"',
-                ' cropleft="', sx / w, '"',
-                ' croptop="', sy / h, '"',
-                ' cropright="', (w - sx - sw) / w, '"',
-                ' cropbottom="', (h - sy - sh) / h, '"',
-                ' />',
-                '</g_vml_:group>');
+// ----- START sencha patch
+
+    vmlStr.push(' ">');
+
+    // Draw a special cropping div if needed
+    if (sx || sy) {
+      // Apply scales to width and height
+      vmlStr.push('<div style="overflow: hidden; width:', Math.ceil((dw + sx * dw / sw) * scaleX), 'px;',
+                  ' height:', Math.ceil((dh + sy * dh / sh) * scaleY), 'px;',
+                  ' filter:progid:DxImageTransform.Microsoft.Matrix(Dx=',
+                  -sx * dw / sw * scaleX, ',Dy=', -sy * dh / sh * scaleY, ');">');
+    }
+    
+      
+    // Apply scales to width and height
+    vmlStr.push('<div style="width:', Math.round(scaleX * w * dw / sw), 'px;',
+                ' height:', Math.round(scaleY * h * dh / sh), 'px;',
+                ' filter:');
+   
+    // If there is a globalAlpha, apply it to image
+    if(this.globalAlpha < 1) {
+      vmlStr.push(' progid:DXImageTransform.Microsoft.Alpha(opacity=' + (this.globalAlpha * 100) + ')');
+    }
+    
+    vmlStr.push(' progid:DXImageTransform.Microsoft.AlphaImageLoader(src=', image.src, ',sizingMethod=scale)">');
+    
+    // Close the crop div if necessary            
+    if (sx || sy) vmlStr.push('</div>');
+    
+    vmlStr.push('</div></div>');
+
+// ----- END sencha patch
 
     insertVML(this, vmlStr.join(''));
   };
@@ -1248,6 +1297,8 @@ if (!document.createElement('canvas').getContext) {
     var c = mc(aRot);
     var s = ms(aRot);
 
+    this.rotation_ += aRot; // sencha patch
+
     var m1 = [
       [c,  s, 0],
       [-s, c, 0],
@@ -1401,7 +1452,12 @@ if (!document.createElement('canvas').getContext) {
     }
     var doc = this.element_.ownerDocument;
     this.textMeasureEl_.innerHTML = '';
-    this.textMeasureEl_.style.font = this.font;
+
+    // sencha patch FIX: Apply current font style to textMeasureEl to get correct size
+    var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_),
+            fontStyleString = buildStyle(fontStyle);        
+    this.textMeasureEl_.style.font = fontStyleString;
+
     // Don't use innerHTML or innerText because they allow markup/whitespace.
     this.textMeasureEl_.appendChild(doc.createTextNode(text));
     return {width: this.textMeasureEl_.offsetWidth};
