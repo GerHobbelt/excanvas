@@ -1,3 +1,5 @@
+== FROM: http://dev.sencha.com/playpen/tm/excanvas-patch/excanvas-diff.patch
+
 Index: excanvas.js
 ===================================================================
 --- excanvas.js	(revision 63)
