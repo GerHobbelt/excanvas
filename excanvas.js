@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Use this conditional to import (changing excanvas.js path)
+//
+// <!--[if lte IE 8]><!-- IE8 and lower only -->
+//   <script src="excanvas.js"></script>
+// <![endif]-->
 
 // Known Issues:
 //
@@ -266,8 +271,8 @@ if (!document.createElement('canvas').getContext) {
   function onResize(e) {
     var first = (e = e.srcElement).firstChild;
     if (first) {
-      first.style.width =  el.clientWidth + 'px';
-      first.style.height = el.clientHeight + 'px';
+      first.style.width =  e.clientWidth + 'px';
+      first.style.height = e.clientHeight + 'px';
     }
   }
 
