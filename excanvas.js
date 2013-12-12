@@ -36,19 +36,49 @@
 // Only add this code if we do not already have a canvas implementation
 if (!document.createElement('canvas').getContext) {
 
-(function() {
+(function(window, undefined/*fast undefined*/) {
 
   // alias some functions to make (compiled) code shorter
+  var document = window.document;
   var m = Math;
-  var mr = m.round;
   var ms = m.sin;
   var mc = m.cos;
-  var abs = m.abs;
   var sqrt = m.sqrt;
+  var PI = Math.PI;
+  var IE8_AND_LOWER = /MSIE/.test(navigator.userAgent) && !window.addEventListener;
 
   // this is used for sub pixel precision
   var Z = 10;
   var Z2 = Z / 2;
+
+  // IE Fast Math - on IE local functions are faster than Math function calls
+  function mCeil(n) {
+        return n % 1 ? (n > 0 ? n + 1 : n) | 0 : n;
+  }
+
+  function mFloor(n) {
+      return n % 1 ? (n > 0 ? n : n - 1) | 0 : n;
+  }
+
+  function mAbs(n) {
+      return 0 > n ? -n : n;
+  }
+
+  function mRound(n) {
+      return (0 > n ? -0.5 : 0.5) + n | 0;
+  }
+
+  function mMax(a, b) {
+      return a < b ? b : a;
+  }
+
+  function mMin(a, b) {
+      return a < b ? a : b;
+  }
+
+  function clamp(v, min, max) {
+    return v < min ? min : v > max ? max : v; 
+  }
 
   /**
    * This funtion is assigned to the <canvas> elements as element.getContext().
@@ -56,8 +86,7 @@ if (!document.createElement('canvas').getContext) {
    * @return {CanvasRenderingContext2D_}
    */
   function getContext() {
-    return this.context_ ||
-        (this.context_ = new CanvasRenderingContext2D_(this));
+    return this.context_ || (this.context_ = new CanvasRenderingContext2D_(this));
   }
 
   var slice = Array.prototype.slice;
@@ -86,30 +115,27 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function encodeHtmlAttribute(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    // alternative implementation with more options: https://gist.github.com/LeoDutra/5215180
+    return ('' + s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   }
 
   function addNamespace(doc, prefix, urn) {
-  /*
-    //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
-    //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+    /*
+      //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
+      //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
 
-  official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
+    official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
 
-  item(): iIndex  Required. Integer that specifies the zero-based index of the item to be returned.
+    item(): iIndex  Required. Integer that specifies the zero-based index of the item to be returned.
 
-  WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
-  */
+    WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
+    */
 
-  for (var i = 0, l = doc.namespaces.length; i < l; ++i)
-  {
-    var nsi = doc.namespaces.item(i);
-    if (nsi.name == prefix)
+    for (var i = 0, l = doc.namespaces.length; i < l;)
     {
-      return;
+      if (doc.namespaces.item(i++).name == prefix) return;
     }
-  }
-        doc.namespaces.add(prefix, urn, '#default#VML');
+    doc.namespaces.add(prefix, urn, '#default#VML');
   }
 
   function addNamespacesAndStylesheet(doc) {
@@ -131,26 +157,28 @@ if (!document.createElement('canvas').getContext) {
 
   var G_vmlCanvasManager_ = {
     init: function(opt_doc) {
-      var doc = opt_doc || document;
-      // Create a dummy element so that IE will allow canvas elements to be
-      // recognized.
-      doc.createElement('canvas');
-      /*
-       * When lazy loading excanvas.js, the onreadystatechange event is never fired
-       * because doc.readyState already reports "complete".
-       */
-      if(doc.readyState !== "complete"){
-        doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
-      } else {
-        this.init_(doc);
+      if (IE8_AND_LOWER) {
+        var doc = opt_doc || document;
+        // Create a dummy element so that IE will allow canvas elements to be
+        // recognized.
+        doc.createElement('canvas');
+        /*
+         * When lazy loading excanvas.js, the onreadystatechange event is never fired
+         * because doc.readyState already reports "complete".
+         */
+        if(doc.readyState == "complete"){
+          this.init_(doc);
+        } else {
+          doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
+        }
       }
     },
 
     init_: function(doc) {
       // find all canvas elements
       var els = doc.getElementsByTagName('canvas');
-      for (var i = 0, l = els.length; i < l; ++i) {
-        this.initElement(els[i]);
+      for (var i = 0, l = els.length; i < l;) {
+        this.initElement(els[i++]);
       }
     },
 
@@ -236,10 +264,10 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function onResize(e) {
-    var el = e.srcElement;
-    if (el.firstChild) {
-      el.firstChild.style.width =  el.clientWidth + 'px';
-      el.firstChild.style.height = el.clientHeight + 'px';
+    var first = (e = e.srcElement).firstChild;
+    if (first) {
+      first.style.width =  e.clientWidth + 'px';
+      first.style.height = e.clientHeight + 'px';
     }
   }
 
@@ -247,8 +275,8 @@ if (!document.createElement('canvas').getContext) {
 
   // precompute "00" to "FF"
   var decToHex = [];
-  for (var i = 0; i < 16; i++) {
-    for (var j = 0; j < 16; j++) {
+  for (var i = 0; i < 16; ++i) {
+    for (var j = 0; j < 16; ++j) {
       decToHex[i * 16 + j] = i.toString(16) + j.toString(16);
     }
   }
@@ -262,10 +290,18 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function matrixMultiply(m1, m2) {
+    // plain is faster than loop
+    // cache is faster on IE and allows better minification
+    var m1_0 = m1[0];
+    var m1_1 = m1[1];
+    var m1_2 = m1[2];
+    var m2_0 = m2[0];
+    var m2_1 = m2[1];
+    var m2_2 = m2[2];
     return [
-      [m1[0][0] * m2[0][0] + m1[0][1] * m2[1][0] + m1[0][2] * m2[2][0], m1[0][0] * m2[0][1] + m1[0][1] * m2[1][1] + m1[0][2] * m2[2][1], m1[0][0] * m2[0][2] + m1[0][1] * m2[1][2] + m1[0][2] * m2[2][2]],
-      [m1[1][0] * m2[0][0] + m1[1][1] * m2[1][0] + m1[1][2] * m2[2][0], m1[1][0] * m2[0][1] + m1[1][1] * m2[1][1] + m1[1][2] * m2[2][1], m1[1][0] * m2[0][2] + m1[1][1] * m2[1][2] + m1[1][2] * m2[2][2]],
-      [m1[2][0] * m2[0][0] + m1[2][1] * m2[1][0] + m1[2][2] * m2[2][0], m1[2][0] * m2[0][1] + m1[2][1] * m2[1][1] + m1[2][2] * m2[2][1], m1[2][0] * m2[0][2] + m1[2][1] * m2[1][2] + m1[2][2] * m2[2][2]]
+      [m1_0[0] * m2_0[0] + m1_0[1] * m2_1[0] + m1_0[2] * m2_2[0], m1_0[0] * m2_0[1] + m1_0[1] * m2_1[1] + m1_0[2] * m2_2[1], m1_0[0] * m2_0[2] + m1_0[1] * m2_1[2] + m1_0[2] * m2_2[2]],
+      [m1_1[0] * m2_0[0] + m1_1[1] * m2_1[0] + m1_1[2] * m2_2[0], m1_1[0] * m2_0[1] + m1_1[1] * m2_1[1] + m1_1[2] * m2_2[1], m1_1[0] * m2_0[2] + m1_1[1] * m2_1[2] + m1_1[2] * m2_2[2]],
+      [m1_2[0] * m2_0[0] + m1_2[1] * m2_1[0] + m1_2[2] * m2_2[0], m1_2[0] * m2_0[1] + m1_2[1] * m2_1[1] + m1_2[2] * m2_2[1], m1_2[0] * m2_0[2] + m1_2[1] * m2_1[2] + m1_2[2] * m2_2[2]]
     ];
   }
 
@@ -287,7 +323,7 @@ if (!document.createElement('canvas').getContext) {
     o2.arcScaleX_    = o1.arcScaleX_;
     o2.arcScaleY_    = o1.arcScaleY_;
     o2.lineScale_    = o1.lineScale_;
-    o2.rotation_     = o1.rotation_; // used for images (sencha-patch)
+    o2.rotation_     = o1.rotation_; // used for images (Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/)
   }
 
   var colorData = {
@@ -437,18 +473,13 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function percent(s) {
-    return parseFloat(s) / 100;
-  }
-
-  function clamp(v, min, max) {
-    return v < min ? min : v > max ? max : v; 
+    return parseFloat(s) * 0.01; // n * 0.01 is faster than n / 100 on IE
   }
 
   function hslToRgb(parts){
     var r, g, b, h, s, l;
     h = parseFloat(parts[0]) / 360 % 360;
-    if (h < 0)
-      h++;
+    if (h < 0) ++h;
     s = clamp(percent(parts[1]), 0, 1);
     l = clamp(percent(parts[2]), 0, 1);
     if (s == 0) {
@@ -461,16 +492,16 @@ if (!document.createElement('canvas').getContext) {
       b = hueToRgb(p, q, h - 1 / 3);
     }
 
-    return '#' + decToHex[Math.floor(r * 255)] +
-        decToHex[Math.floor(g * 255)] +
-        decToHex[Math.floor(b * 255)];
+    return '#' + decToHex[mFloor(r * 255)] +
+        decToHex[mFloor(g * 255)] +
+        decToHex[mFloor(b * 255)];
   }
 
   function hueToRgb(m1, m2, h) {
     if (h < 0)
-      h++;
+      ++h;
     if (h > 1)
-      h--;
+      --h;
 
     if (6 * h < 1)
       return m1 + (m2 - m1) * 6 * h;
@@ -497,9 +528,9 @@ if (!document.createElement('canvas').getContext) {
     } else if (/^rgb/.test(styleString)) {
       var parts = getRgbHslContent(styleString);
       var str = '#', n;
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 3; ++i) {
         if (parts[i].indexOf('%') != -1) {
-          n = Math.floor(percent(parts[i]) * 255);
+          n = mFloor(percent(parts[i]) * 255);
         } else {
           n = +parts[i];
         }
@@ -585,8 +616,7 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function buildStyle(style) {
-    return style.style + ' ' + style.variant + ' ' + style.weight + ' ' +
-        style.size + 'px ' + style.family;
+    return style.style + ' ' + style.variant + ' ' + style.weight + ' ' + style.size + 'px ' + style.family;
   }
 
   var lineCapMap = {
@@ -599,7 +629,7 @@ if (!document.createElement('canvas').getContext) {
   }
 
   // used by draw timer
-  var drawDelay = 1000 / 30;  //30 "renders" a second, on average.
+  var drawDelay = 1000 * 0.3;  //30 "renders" a second, on average.
 
   /**
    * Add a block of VML to the scene. This VML will be added at some point in the future,but after this call completes.
@@ -687,7 +717,7 @@ if (!document.createElement('canvas').getContext) {
     this.arcScaleX_ = 1;
     this.arcScaleY_ = 1;
     this.lineScale_ = 1;
-    this.rotation_ = 0; // sencha-patch
+    this.rotation_ = 0; // Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
   }
 
   var contextPrototype = CanvasRenderingContext2D_.prototype;
@@ -869,10 +899,10 @@ if (!document.createElement('canvas').getContext) {
   contextPrototype.drawImage = function(image, var_args) {
     var dx, dy, dw, dh, sx, sy, sw, sh;
 
-    // to fix new Image() we check the existance of runtimeStyle (sencha-patch)
+    // to fix new Image() we check the existance of runtimeStyle (Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/)
     var rts = image.runtimeStyle.width;
     
-    if (rts) { // sencha-patch
+    if (rts) { // Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
       // to find the original width we overide the width and height
       var oldRuntimeWidth = image.runtimeStyle.width;
       var oldRuntimeHeight = image.runtimeStyle.height;
@@ -884,7 +914,7 @@ if (!document.createElement('canvas').getContext) {
     var w = image.width;
     var h = image.height;
 
-    if(rts) { // sencha patch
+    if(rts) { // Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
       // and remove overides
       image.runtimeStyle.width = oldRuntimeWidth;
       image.runtimeStyle.height = oldRuntimeHeight;
@@ -976,31 +1006,31 @@ if (!document.createElement('canvas').getContext) {
       max.x = m.max(max.x, c2.x, c3.x, c4.x);
       max.y = m.max(max.y, c2.y, c3.y, c4.y);
 
-      vmlStr.push('padding:0 ', mr(max.x / Z), 'px ', mr(max.y / Z),
+      vmlStr.push('padding:0 ', mRound(max.x / Z), 'px ', mRound(max.y / Z),
                   'px 0;filter:progid:DXImageTransform.Microsoft.Matrix(',
                   filter.join(''), ", sizingmethod='clip');");
 
     } else {
-      vmlStr.push('top:', mr(d.y / Z), 'px;left:', mr(d.x / Z), 'px;');
+      vmlStr.push('top:', mRound(d.y / Z), 'px;left:', mRound(d.x / Z), 'px;');
     }
 
-// ----- START sencha patch
+// ----- START Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
 
     vmlStr.push(' ">');
 
     // Draw a special cropping div if needed
     if (sx || sy) {
       // Apply scales to width and height
-      vmlStr.push('<div style="overflow: hidden; width:', Math.ceil((dw + sx * dw / sw) * scaleX), 'px;',
-                  ' height:', Math.ceil((dh + sy * dh / sh) * scaleY), 'px;',
+      vmlStr.push('<div style="overflow: hidden; width:', mCeil((dw + sx * dw / sw) * scaleX), 'px;',
+                  ' height:', mCeil((dh + sy * dh / sh) * scaleY), 'px;',
                   ' filter:progid:DxImageTransform.Microsoft.Matrix(Dx=',
                   -sx * dw / sw * scaleX, ',Dy=', -sy * dh / sh * scaleY, ');">');
     }
     
       
     // Apply scales to width and height
-    vmlStr.push('<div style="width:', Math.round(scaleX * w * dw / sw), 'px;',
-                ' height:', Math.round(scaleY * h * dh / sh), 'px;',
+    vmlStr.push('<div style="width:', mRound(scaleX * w * dw / sw), 'px;',
+                ' height:', mRound(scaleY * h * dh / sh), 'px;',
                 ' filter:');
    
     // If there is a globalAlpha, apply it to image
@@ -1015,7 +1045,7 @@ if (!document.createElement('canvas').getContext) {
     
     vmlStr.push('</div></div>');
 
-// ----- END sencha patch
+// ----- END Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
 
     insertVML(this, vmlStr.join(''));
   };
@@ -1039,17 +1069,17 @@ if (!document.createElement('canvas').getContext) {
     var min = {x: null, y: null};
     var max = {x: null, y: null};
 
-    for (var i = 0; i < this.currentPath_.length; i++) {
+    for (var i = 0, len = this.currentPath_.length; i < len; ++i) {
       var p = this.currentPath_[i];
       var c;
 
       switch (p.type) {
         case 'moveTo':
           c = p;
-          lineStr.push(' m ', mr(p.x), ',', mr(p.y));
+          lineStr.push(' m ', mRound(p.x), ',', mRound(p.y));
           break;
         case 'lineTo':
-          lineStr.push(' l ', mr(p.x), ',', mr(p.y));
+          lineStr.push(' l ', mRound(p.x), ',', mRound(p.y));
           break;
         case 'close':
           lineStr.push(' x ');
@@ -1057,19 +1087,19 @@ if (!document.createElement('canvas').getContext) {
           break;
         case 'bezierCurveTo':
           lineStr.push(' c ',
-                       mr(p.cp1x), ',', mr(p.cp1y), ',',
-                       mr(p.cp2x), ',', mr(p.cp2y), ',',
-                       mr(p.x), ',', mr(p.y));
+                       mRound(p.cp1x), ',', mRound(p.cp1y), ',',
+                       mRound(p.cp2x), ',', mRound(p.cp2y), ',',
+                       mRound(p.x), ',', mRound(p.y));
           break;
         case 'at':
         case 'wa':
           lineStr.push(' ', p.type, ' ',
-                       mr(p.x - this.arcScaleX_ * p.radius), ',',
-                       mr(p.y - this.arcScaleY_ * p.radius), ' ',
-                       mr(p.x + this.arcScaleX_ * p.radius), ',',
-                       mr(p.y + this.arcScaleY_ * p.radius), ' ',
-                       mr(p.xStart), ',', mr(p.yStart), ' ',
-                       mr(p.xEnd), ',', mr(p.yEnd));
+                       mRound(p.x - this.arcScaleX_ * p.radius), ',',
+                       mRound(p.y - this.arcScaleY_ * p.radius), ' ',
+                       mRound(p.x + this.arcScaleX_ * p.radius), ',',
+                       mRound(p.y + this.arcScaleY_ * p.radius), ' ',
+                       mRound(p.xStart), ',', mRound(p.yStart), ' ',
+                       mRound(p.xEnd), ',', mRound(p.yEnd));
           break;
       }
 
@@ -1155,7 +1185,7 @@ if (!document.createElement('canvas').getContext) {
         var p1 = getCoords(ctx, x1, y1);
         var dx = p1.x - p0.x;
         var dy = p1.y - p0.y;
-        angle = Math.atan2(dx, dy) * 180 / Math.PI;
+        angle = Math.atan2(dx, dy) * 180 / PI;
 
         // The angle should be a non-negative number.
         if (angle < 0) {
@@ -1176,7 +1206,7 @@ if (!document.createElement('canvas').getContext) {
 
         width  /= arcScaleX * Z;
         height /= arcScaleY * Z;
-        var dimension = m.max(width, height);
+        var dimension = mMax(width, height);
         shift = 2 * fillStyle.r0_ / dimension;
         expansion = 2 * fillStyle.r1_ / dimension - shift;
       }
@@ -1195,7 +1225,7 @@ if (!document.createElement('canvas').getContext) {
       var opacity2 = stops[length - 1].alpha * ctx.globalAlpha;
 
       var colors = [];
-      for (var i = 0; i < length; i++) {
+      for (var i = 0; i < length; ++i) {
         var stop = stops[i];
         colors.push(stop.offset * expansion + shift + ' ' + stop.color);
       }
@@ -1282,7 +1312,7 @@ if (!document.createElement('canvas').getContext) {
       // transformation. So its square root can be used as a scale factor
       // for width.
       var det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
-      ctx.lineScale_ = sqrt(abs(det));
+      ctx.lineScale_ = sqrt(mAbs(det));
     }
   }
 
@@ -1300,7 +1330,7 @@ if (!document.createElement('canvas').getContext) {
     var c = mc(aRot);
     var s = ms(aRot);
 
-    this.rotation_ += aRot; // sencha patch
+    this.rotation_ += aRot; // Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/
 
     var m1 = [
       [c,  s, 0],
@@ -1422,7 +1452,7 @@ if (!document.createElement('canvas').getContext) {
     var skewM = m[0][0].toFixed(3) + ',' + m[1][0].toFixed(3) + ',' +
                 m[0][1].toFixed(3) + ',' + m[1][1].toFixed(3) + ',0,0';
 
-    var skewOffset = mr(d.x / Z + 1 - m[0][0]) + ',' + mr(d.y / Z - 2 * m[1][0]);
+    var skewOffset = mRound(d.x / Z + 1 - m[0][0]) + ',' + mRound(d.y / Z - 2 * m[1][0]);
 
     lineStr.push('<g_vml_:skew on="t" matrix="', skewM ,'" ',
                  ' offset="', skewOffset, '" origin="', left ,' 0" />',
@@ -1455,7 +1485,7 @@ if (!document.createElement('canvas').getContext) {
     var doc = this.element_.ownerDocument;
     this.textMeasureEl_.innerHTML = '';
 
-    // sencha patch FIX: Apply current font style to textMeasureEl to get correct size
+    // Sencha patch - http://dev.sencha.com/playpen/tm/excanvas-patch/ FIX: Apply current font style to textMeasureEl to get correct size
     var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_),
             fontStyleString = buildStyle(fontStyle);        
     this.textMeasureEl_.style.font = fontStyleString;
@@ -1564,6 +1594,6 @@ if (!document.createElement('canvas').getContext) {
   // Additional info for jqPlot
   // https://bitbucket.org/cleonello/jqplot/diff/src/excanvas.js?diff1=f289920f4d4f&diff2=b233cdeb2e574e323dacd7e54eb379d20aeb3811&at=default
   G_vmlCanvasManager._version = 888;
-})();
+})(window);
 
 } // if
