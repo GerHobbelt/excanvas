@@ -1,3 +1,5 @@
+// http://dev.sencha.com/playpen/tm/excanvas-patch/excanvas-modified.js
+
 // Copyright 2006 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,8 +32,6 @@
 //   (http://webfx.eae.net/dhtml/boxsizing/boxsizing.html)
 // * Non uniform scaling does not correctly scale strokes.
 // * Optimize. There is always room for speed improvements.
-
-// Patched (manually) using "Sencha patch": http://dev.sencha.com/playpen/tm/excanvas-patch/
 
 // Only add this code if we do not already have a canvas implementation
 if (!document.createElement('canvas').getContext) {
@@ -89,32 +89,17 @@ if (!document.createElement('canvas').getContext) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   }
 
-  function addNamespace(doc, prefix, urn) {
-  /*
-    //if (!doc.namespaces[prefix]) {        // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
-    //if (!doc.namespaces.item(prefix)) {   // IE8 b0rks with 'invalid argument'!   v8.0.7600.16385 Win7/64
-
-  official documentation says ( http://msdn.microsoft.com/en-us/library/ms537470%28VS.85%29.aspx ):
-
-  item(): iIndex  Required. Integer that specifies the zero-based index of the item to be returned.
-
-  WE, however, pass in a NAMESPACE (prefix variable), so we'll have to do it another way:
-  */
-
-  for (var i = 0, l = doc.namespaces.length; i < l; ++i)
-  {
-    var nsi = doc.namespaces.item(i);
-    if (nsi.name == prefix)
-    {
-      return;
-    }
-  }
-        doc.namespaces.add(prefix, urn, '#default#VML');
-  }
-
   function addNamespacesAndStylesheet(doc) {
-    addNamespace(doc, 'g_vml_', 'urn:schemas-microsoft-com:vml');
-    addNamespace(doc, 'g_o_', 'urn:schemas-microsoft-com:office:office');
+    // create xmlns
+    if (!doc.namespaces['g_vml_']) {
+      doc.namespaces.add('g_vml_', 'urn:schemas-microsoft-com:vml',
+                         '#default#VML');
+
+    }
+    if (!doc.namespaces['g_o_']) {
+      doc.namespaces.add('g_o_', 'urn:schemas-microsoft-com:office:office',
+                         '#default#VML');
+    }
 
     // Setup default CSS.  Only add one style sheet per document
     if (!doc.styleSheets['ex_canvas_']) {
@@ -131,25 +116,19 @@ if (!document.createElement('canvas').getContext) {
 
   var G_vmlCanvasManager_ = {
     init: function(opt_doc) {
-      var doc = opt_doc || document;
-      // Create a dummy element so that IE will allow canvas elements to be
-      // recognized.
-      doc.createElement('canvas');
-      /*
-       * When lazy loading excanvas.js, the onreadystatechange event is never fired
-       * because doc.readyState already reports "complete".
-       */
-      if(doc.readyState !== "complete"){
+      if (/MSIE/.test(navigator.userAgent) && !window.opera) {
+        var doc = opt_doc || document;
+        // Create a dummy element so that IE will allow canvas elements to be
+        // recognized.
+        doc.createElement('canvas');
         doc.attachEvent('onreadystatechange', bind(this.init_, this, doc));
-      } else {
-        this.init_(doc);
       }
     },
 
     init_: function(doc) {
       // find all canvas elements
       var els = doc.getElementsByTagName('canvas');
-      for (var i = 0, l = els.length; i < l; ++i) {
+      for (var i = 0; i < els.length; i++) {
         this.initElement(els[i]);
       }
     },
@@ -196,24 +175,6 @@ if (!document.createElement('canvas').getContext) {
         //el.getContext().setCoordsize_()
       }
       return el;
-    },
-
-    /*
-    Release canvas node to prevent memory leaks (issue #82 - http://code.google.com/p/explorercanvas/issues/detail?id=82).
-
-    This method should be called manually before destroying your reference(s) to the excanvas object.
-    */
-    uninitElement: function(el) {
-      if (el.getContext) {
-        var ctx = el.getContext();
-        delete ctx.element_;
-        delete ctx.canvas;
-        el.innerHTML = "";
-        el.context_ = null;
-        el.getContext = null;
-        el.detachEvent("onpropertychange", onPropertyChange);
-        el.detachEvent("onresize", onResize);
-      }
     }
   };
 
@@ -262,11 +223,20 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function matrixMultiply(m1, m2) {
-    return [
-      [m1[0][0] * m2[0][0] + m1[0][1] * m2[1][0] + m1[0][2] * m2[2][0], m1[0][0] * m2[0][1] + m1[0][1] * m2[1][1] + m1[0][2] * m2[2][1], m1[0][0] * m2[0][2] + m1[0][1] * m2[1][2] + m1[0][2] * m2[2][2]],
-      [m1[1][0] * m2[0][0] + m1[1][1] * m2[1][0] + m1[1][2] * m2[2][0], m1[1][0] * m2[0][1] + m1[1][1] * m2[1][1] + m1[1][2] * m2[2][1], m1[1][0] * m2[0][2] + m1[1][1] * m2[1][2] + m1[1][2] * m2[2][2]],
-      [m1[2][0] * m2[0][0] + m1[2][1] * m2[1][0] + m1[2][2] * m2[2][0], m1[2][0] * m2[0][1] + m1[2][1] * m2[1][1] + m1[2][2] * m2[2][1], m1[2][0] * m2[0][2] + m1[2][1] * m2[1][2] + m1[2][2] * m2[2][2]]
-    ];
+    var result = createMatrixIdentity();
+
+    for (var x = 0; x < 3; x++) {
+      for (var y = 0; y < 3; y++) {
+        var sum = 0;
+
+        for (var z = 0; z < 3; z++) {
+          sum += m1[x][z] * m2[z][y];
+        }
+
+        result[x][y] = sum;
+      }
+    }
+    return result;
   }
 
   function copyState(o1, o2) {
@@ -287,7 +257,7 @@ if (!document.createElement('canvas').getContext) {
     o2.arcScaleX_    = o1.arcScaleX_;
     o2.arcScaleY_    = o1.arcScaleY_;
     o2.lineScale_    = o1.lineScale_;
-    o2.rotation_     = o1.rotation_; // used for images (sencha-patch)
+	o2.rotation_	 = o1.rotation_; // used for images
   }
 
   var colorData = {
@@ -430,7 +400,9 @@ if (!document.createElement('canvas').getContext) {
     var end = styleString.indexOf(')', start + 1);
     var parts = styleString.substring(start + 1, end).split(',');
     // add alpha if needed
-    if (parts.length != 4 || styleString.charAt(3) != 'a') {
+    if (parts.length == 4 && styleString.substr(3, 1) == 'a') {
+      alpha = Number(parts[3]);
+    } else {
       parts[3] = 1;
     }
     return parts;
@@ -441,11 +413,11 @@ if (!document.createElement('canvas').getContext) {
   }
 
   function clamp(v, min, max) {
-    return v < min ? min : v > max ? max : v; 
+    return Math.min(max, Math.max(min, v));
   }
 
   function hslToRgb(parts){
-    var r, g, b, h, s, l;
+    var r, g, b;
     h = parseFloat(parts[0]) / 360 % 360;
     if (h < 0)
       h++;
@@ -482,13 +454,7 @@ if (!document.createElement('canvas').getContext) {
       return m1;
   }
 
-  var processStyleCache = {};
-
   function processStyle(styleString) {
-    if (styleString in processStyleCache) {
-      return processStyleCache[styleString];
-    }
-
     var str, alpha = 1;
 
     styleString = String(styleString);
@@ -501,11 +467,11 @@ if (!document.createElement('canvas').getContext) {
         if (parts[i].indexOf('%') != -1) {
           n = Math.floor(percent(parts[i]) * 255);
         } else {
-          n = +parts[i];
+          n = Number(parts[i]);
         }
         str += decToHex[clamp(n, 0, 255)];
       }
-      alpha = +parts[3];
+      alpha = parts[3];
     } else if (/^hsl/.test(styleString)) {
       var parts = getRgbHslContent(styleString);
       str = hslToRgb(parts);
@@ -513,7 +479,7 @@ if (!document.createElement('canvas').getContext) {
     } else {
       str = colorData[styleString] || styleString;
     }
-    return processStyleCache[styleString] = {color: str, alpha: alpha};
+    return {color: str, alpha: alpha};
   }
 
   var DEFAULT_STYLE = {
@@ -569,7 +535,7 @@ if (!document.createElement('canvas').getContext) {
     } else if(style.size.indexOf('%') != -1) {
       computedStyle.size = (canvasFontSize / 100) * fontSize;
     } else if (style.size.indexOf('pt') != -1) {
-      computedStyle.size = fontSize / .75;
+      computedStyle.size = canvasFontSize * (4/3) * fontSize;
     } else {
       computedStyle.size = canvasFontSize;
     }
@@ -577,9 +543,6 @@ if (!document.createElement('canvas').getContext) {
     // Different scaling between normal text and VML text. This was found using
     // trial and error to get the same size as non VML text.
     computedStyle.size *= 0.981;
-
-    // Fix for VML handling of bare font family names.  Add a '' around font family names.
-    computedStyle.family =  "'" + computedStyle.family.replace(/(\'|\")/g,'').replace(/\s*,\s*/g, "', '") + "'";
 
     return computedStyle;
   }
@@ -589,73 +552,30 @@ if (!document.createElement('canvas').getContext) {
         style.size + 'px ' + style.family;
   }
 
-  var lineCapMap = {
-    'butt': 'flat',
-    'round': 'round'
-  };
-
   function processLineCap(lineCap) {
-    return lineCapMap[lineCap] || 'square';
-  }
-
-  // used by draw timer
-  var drawDelay = 1000 / 30;  //30 "renders" a second, on average.
-
-  /**
-   * Add a block of VML to the scene. This VML will be added at some point in the future,but after this call completes.
-   * @param ctx CanvasRenderingContext2D_ object.
-   * @param vmlStr VML to add.
-   */
-  function insertVML(ctx, vmlStr) {
-    ctx.vmlList_.push(vmlStr);
-    startDrawTimer(ctx);
-  }
-
-  //Called exclusively by insertVML.
-  function startDrawTimer(ctx) {
-    if (!ctx.drawScheduled_) {
-      ctx.drawScheduled_ = true;
-      var timer = function () {
-        drawTimerFired(ctx);
-      };
-      var now = new Date().getTime();
-      var delay = clamp(drawDelay - (now - ctx.lastDrawn_), 1, drawDelay);
-      setTimeout(timer, delay);
+    switch (lineCap) {
+      case 'butt':
+        return 'flat';
+      case 'round':
+        return 'round';
+      case 'square':
+      default:
+        return 'square';
     }
-  }
-
-  //Called exclusively by the Draw timer.
-  function drawTimerFired(ctx) {
-    ctx.lastDrawn_ = new Date().getTime();
-    var vml = '';
-    if (ctx.vmlList_.length > 0) {
-      vml = ctx.vmlList_.join('\n');
-    }
-    if (ctx.textMeasureEl_) {
-      ctx.textMeasureEl_.removeNode(true);
-      ctx.textMeasureEl_ = null;
-    }
-    ctx.element_.innerHTML = vml;
-    ctx.drawScheduled_ = false;
   }
 
   /**
    * This class implements CanvasRenderingContext2D interface as described by
    * the WHATWG.
-   * @param {HTMLElement} canvasElement The element that the 2D context should
+   * @param {HTMLElement} surfaceElement The element that the 2D context should
    * be associated with
    */
-  function CanvasRenderingContext2D_(canvasElement) {
+  function CanvasRenderingContext2D_(surfaceElement) {
     this.m_ = createMatrixIdentity();
 
     this.mStack_ = [];
     this.aStack_ = [];
     this.currentPath_ = [];
-
-    //Draw timer properties
-    this.drawScheduled_ = false;
-    this.lastDrawn_ = 0;
-    this.vmlList_ = [];
 
     // Canvas context properties
     this.strokeStyle = '#000';
@@ -669,25 +589,20 @@ if (!document.createElement('canvas').getContext) {
     this.font = '10px sans-serif';
     this.textAlign = 'left';
     this.textBaseline = 'alphabetic';
-    this.canvas = canvasElement;
+    this.canvas = surfaceElement;
 
-    var cssText = 'width:' + canvasElement.clientWidth + 'px;height:' +
-        canvasElement.clientHeight + 'px;overflow:hidden;position:absolute';
-    var el = canvasElement.ownerDocument.createElement('div');
-    el.style.cssText = cssText;
-    canvasElement.appendChild(el);
-
-    var overlayEl = el.cloneNode(false);
-    // Use a non transparent background.
-    overlayEl.style.backgroundColor = 'red';
-    overlayEl.style.filter = 'alpha(opacity=0)';
-    canvasElement.appendChild(overlayEl);
+    var el = surfaceElement.ownerDocument.createElement('div');
+    el.style.width =  surfaceElement.clientWidth + 'px';
+    el.style.height = surfaceElement.clientHeight + 'px';
+    el.style.overflow = 'hidden';
+    el.style.position = 'absolute';
+    surfaceElement.appendChild(el);
 
     this.element_ = el;
     this.arcScaleX_ = 1;
     this.arcScaleY_ = 1;
     this.lineScale_ = 1;
-    this.rotation_ = 0; // sencha-patch
+	this.rotation_ = 0;
   }
 
   var contextPrototype = CanvasRenderingContext2D_.prototype;
@@ -696,13 +611,7 @@ if (!document.createElement('canvas').getContext) {
       this.textMeasureEl_.removeNode(true);
       this.textMeasureEl_ = null;
     }
-
-    this.vmlList_ = [];
-    this.mStack_ = [];
-    this.aStack_ = [];
-    this.currentPath_ = [];
-
-    startDrawTimer(this);
+    this.element_.innerHTML = '';
   };
 
   contextPrototype.beginPath = function() {
@@ -712,21 +621,14 @@ if (!document.createElement('canvas').getContext) {
   };
 
   contextPrototype.moveTo = function(aX, aY) {
-    var p = getCoords(this, aX, aY);
+    var p = this.getCoords_(aX, aY);
     this.currentPath_.push({type: 'moveTo', x: p.x, y: p.y});
     this.currentX_ = p.x;
     this.currentY_ = p.y;
   };
 
-  // http://code.google.com/p/explorercanvas/issues/detail?id=94
-  function ensureSubpath(self, aX, aY) {
-    if(0 === self.currentPath_.length)
-      self.moveTo(aX, aY);
-  }
-
   contextPrototype.lineTo = function(aX, aY) {
-    var p = getCoords(this, aX, aY);
-    ensureSubpath(this, aX, aY);
+    var p = this.getCoords_(aX, aY);
     this.currentPath_.push({type: 'lineTo', x: p.x, y: p.y});
 
     this.currentX_ = p.x;
@@ -736,10 +638,9 @@ if (!document.createElement('canvas').getContext) {
   contextPrototype.bezierCurveTo = function(aCP1x, aCP1y,
                                             aCP2x, aCP2y,
                                             aX, aY) {
-    var p = getCoords(this, aX, aY);
-    var cp1 = getCoords(this, aCP1x, aCP1y);
-    var cp2 = getCoords(this, aCP2x, aCP2y);
-    ensureSubpath(this, aCP1x, aCP1y);
+    var p = this.getCoords_(aX, aY);
+    var cp1 = this.getCoords_(aCP1x, aCP1y);
+    var cp2 = this.getCoords_(aCP2x, aCP2y);
     bezierCurveTo(this, cp1, cp2, p);
   };
 
@@ -762,8 +663,8 @@ if (!document.createElement('canvas').getContext) {
     // the following is lifted almost directly from
     // http://developer.mozilla.org/en/docs/Canvas_tutorial:Drawing_shapes
 
-    var cp = getCoords(this, aCPx, aCPy);
-    var p = getCoords(this, aX, aY);
+    var cp = this.getCoords_(aCPx, aCPy);
+    var p = this.getCoords_(aX, aY);
 
     var cp1 = {
       x: this.currentX_ + 2.0 / 3.0 * (cp.x - this.currentX_),
@@ -774,7 +675,6 @@ if (!document.createElement('canvas').getContext) {
       y: cp1.y + (p.y - this.currentY_) / 3.0
     };
 
-    ensureSubpath(this, aCPx, aCPy);
     bezierCurveTo(this, cp1, cp2, p);
   };
 
@@ -795,9 +695,9 @@ if (!document.createElement('canvas').getContext) {
                        // that can be represented in binary
     }
 
-    var p = getCoords(this, aX, aY);
-    var pStart = getCoords(this, xStart, yStart);
-    var pEnd = getCoords(this, xEnd, yEnd);
+    var p = this.getCoords_(aX, aY);
+    var pStart = this.getCoords_(xStart, yStart);
+    var pEnd = this.getCoords_(xEnd, yEnd);
 
     this.currentPath_.push({type: arcType,
                            x: p.x,
@@ -807,6 +707,7 @@ if (!document.createElement('canvas').getContext) {
                            yStart: pStart.y,
                            xEnd: pEnd.x,
                            yEnd: pEnd.y});
+
   };
 
   contextPrototype.rect = function(aX, aY, aWidth, aHeight) {
@@ -866,30 +767,31 @@ if (!document.createElement('canvas').getContext) {
     return gradient;
   };
 
-  contextPrototype.drawImage = function(image, var_args) {
+  contextPrototype.drawImage = function(image) {
     var dx, dy, dw, dh, sx, sy, sw, sh;
-
-    // to fix new Image() we check the existance of runtimeStyle (sencha-patch)
+	
+    // to fix new Image() we check the existance of runtimeStyle
     var rts = image.runtimeStyle.width;
-    
-    if (rts) { // sencha-patch
-      // to find the original width we overide the width and height
+	
+    // to find the original width we overide the width and height
+    if(rts) {
       var oldRuntimeWidth = image.runtimeStyle.width;
       var oldRuntimeHeight = image.runtimeStyle.height;
+      		
       image.runtimeStyle.width = 'auto';
-      image.runtimeStyle.height = 'auto';
+      image.runtimeStyle.height = 'auto';	  
     }
 
     // get the original size
     var w = image.width;
     var h = image.height;
-
-    if(rts) { // sencha patch
-      // and remove overides
+	
+    // and remove overides
+    if(rts) {
       image.runtimeStyle.width = oldRuntimeWidth;
-      image.runtimeStyle.height = oldRuntimeHeight;
+      image.runtimeStyle.height = oldRuntimeHeight;		
     }
-
+	
     if (arguments.length == 3) {
       dx = arguments[1];
       dy = arguments[2];
@@ -917,7 +819,7 @@ if (!document.createElement('canvas').getContext) {
       throw Error('Invalid number of arguments');
     }
 
-    var d = getCoords(this, dx, dy);
+    var d = this.getCoords_(dx, dy);
 
     var w2 = sw / 2;
     var h2 = sh / 2;
@@ -926,9 +828,9 @@ if (!document.createElement('canvas').getContext) {
 
     var W = 10;
     var H = 10;
-
+	
     var scaleX = scaleY = 1;
-        
+	
     // FIX: divs give better quality then vml image and also fixes transparent PNG's
     vmlStr.push(' <div style="position:absolute;');
 
@@ -936,14 +838,13 @@ if (!document.createElement('canvas').getContext) {
     // filters are bog-slow, so only create them if abbsolutely necessary
     // The following check doesn't account for skews (which don't exist
     // in the canvas spec (yet) anyway.
-
     if (this.m_[0][0] != 1 || this.m_[0][1] ||
         this.m_[1][1] != 1 || this.m_[1][0]) {
       var filter = [];
 
       // Scaling images using width & height instead of Transform Matrix
       // because of quality loss
-      var c = mc(this.rotation_);        
+      var c = mc(this.rotation_);	
       var s = ms(this.rotation_);
       
       // Inverse rotation matrix
@@ -951,10 +852,10 @@ if (!document.createElement('canvas').getContext) {
         [c,  -s, 0],
         [s, c, 0],
         [0,  0, 1]
-      ];        
-        
+      ];	
+	
       // Get unrotated matrix to get only scaling values
-      var urm = matrixMultiply(irm, this.m_);          
+      var urm = matrixMultiply(irm, this.m_);	  
       scaleX = urm[0][0];
       scaleY = urm[1][1];
     
@@ -969,9 +870,9 @@ if (!document.createElement('canvas').getContext) {
       // Bounding box calculation (need to minimize displayed area so that
       // filters don't waste time on unused pixels.
       var max = d;
-      var c2 = getCoords(this, dx + dw, dy);
-      var c3 = getCoords(this, dx, dy + dh);
-      var c4 = getCoords(this, dx + dw, dy + dh);
+      var c2 = this.getCoords_(dx + dw, dy);
+      var c3 = this.getCoords_(dx, dy + dh);
+      var c4 = this.getCoords_(dx + dw, dy + dh);
 
       max.x = m.max(max.x, c2.x, c3.x, c4.x);
       max.y = m.max(max.y, c2.y, c3.y, c4.y);
@@ -979,12 +880,9 @@ if (!document.createElement('canvas').getContext) {
       vmlStr.push('padding:0 ', mr(max.x / Z), 'px ', mr(max.y / Z),
                   'px 0;filter:progid:DXImageTransform.Microsoft.Matrix(',
                   filter.join(''), ", sizingmethod='clip');");
-
     } else {
       vmlStr.push('top:', mr(d.y / Z), 'px;left:', mr(d.x / Z), 'px;');
     }
-
-// ----- START sencha patch
 
     vmlStr.push(' ">');
 
@@ -1014,10 +912,8 @@ if (!document.createElement('canvas').getContext) {
     if (sx || sy) vmlStr.push('</div>');
     
     vmlStr.push('</div></div>');
-
-// ----- END sencha patch
-
-    insertVML(this, vmlStr.join(''));
+    
+    this.element_.insertAdjacentHTML('beforeEnd', vmlStr.join(''));
   };
 
   contextPrototype.stroke = function(aFill) {
@@ -1104,7 +1000,7 @@ if (!document.createElement('canvas').getContext) {
 
     lineStr.push('</g_vml_:shape>');
 
-    insertVML(this, lineStr.join(''));
+    this.element_.insertAdjacentHTML('beforeEnd', lineStr.join(''));
   };
 
   function appendStroke(ctx, lineStr) {
@@ -1151,8 +1047,8 @@ if (!document.createElement('canvas').getContext) {
         var y0 = fillStyle.y0_ / arcScaleY;
         var x1 = fillStyle.x1_ / arcScaleX;
         var y1 = fillStyle.y1_ / arcScaleY;
-        var p0 = getCoords(ctx, x0, y0);
-        var p1 = getCoords(ctx, x1, y1);
+        var p0 = ctx.getCoords_(x0, y0);
+        var p1 = ctx.getCoords_(x1, y1);
         var dx = p1.x - p0.x;
         var dy = p1.y - p0.y;
         angle = Math.atan2(dx, dy) * 180 / Math.PI;
@@ -1168,7 +1064,7 @@ if (!document.createElement('canvas').getContext) {
           angle = 0;
         }
       } else {
-        var p0 = getCoords(ctx, fillStyle.x0_, fillStyle.y0_);
+        var p0 = ctx.getCoords_(fillStyle.x0_, fillStyle.y0_);
         focus = {
           x: (p0.x - min.x) / width,
           y: (p0.y - min.y) / height
@@ -1241,8 +1137,11 @@ if (!document.createElement('canvas').getContext) {
     this.currentPath_.push({type: 'close'});
   };
 
-  function getCoords(ctx, aX, aY) {
-    var m = ctx.m_;
+  /**
+   * @private
+   */
+  contextPrototype.getCoords_ = function(aX, aY) {
+    var m = this.m_;
     return {
       x: Z * (aX * m[0][0] + aY * m[1][0] + m[2][0]) - Z2,
       y: Z * (aX * m[0][1] + aY * m[1][1] + m[2][1]) - Z2
@@ -1300,8 +1199,8 @@ if (!document.createElement('canvas').getContext) {
     var c = mc(aRot);
     var s = ms(aRot);
 
-    this.rotation_ += aRot; // sencha patch
-
+    this.rotation_ += aRot;
+	
     var m1 = [
       [c,  s, 0],
       [-s, c, 0],
@@ -1356,7 +1255,8 @@ if (!document.createElement('canvas').getContext) {
         offset = {x: 0, y: 0},
         lineStr = [];
 
-    var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_);
+    var fontStyle = getComputedStyle(processFontStyle(this.font),
+                                     this.element_);
 
     var fontStyleString = buildStyle(fontStyle);
 
@@ -1404,7 +1304,7 @@ if (!document.createElement('canvas').getContext) {
         break;
     }
 
-    var d = getCoords(this, x + offset.x, y + offset.y);
+    var d = this.getCoords_(x + offset.x, y + offset.y);
 
     lineStr.push('<g_vml_:line from="', -left ,' 0" to="', right ,' 0.05" ',
                  ' coordsize="100 100" coordorigin="0 0"',
@@ -1422,7 +1322,7 @@ if (!document.createElement('canvas').getContext) {
     var skewM = m[0][0].toFixed(3) + ',' + m[1][0].toFixed(3) + ',' +
                 m[0][1].toFixed(3) + ',' + m[1][1].toFixed(3) + ',0,0';
 
-    var skewOffset = mr(d.x / Z + 1 - m[0][0]) + ',' + mr(d.y / Z - 2 * m[1][0]);
+    var skewOffset = mr(d.x / Z) + ',' + mr(d.y / Z);
 
     lineStr.push('<g_vml_:skew on="t" matrix="', skewM ,'" ',
                  ' offset="', skewOffset, '" origin="', left ,' 0" />',
@@ -1433,7 +1333,7 @@ if (!document.createElement('canvas').getContext) {
                  ';font:', encodeHtmlAttribute(fontStyleString),
                  '" /></g_vml_:line>');
 
-    insertVML(this, lineStr.join(''));
+    this.element_.insertAdjacentHTML('beforeEnd', lineStr.join(''));
   };
 
   contextPrototype.fillText = function(text, x, y, maxWidth) {
@@ -1454,11 +1354,10 @@ if (!document.createElement('canvas').getContext) {
     }
     var doc = this.element_.ownerDocument;
     this.textMeasureEl_.innerHTML = '';
-
-    // sencha patch FIX: Apply current font style to textMeasureEl to get correct size
-    var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_),
-            fontStyleString = buildStyle(fontStyle);        
-    this.textMeasureEl_.style.font = fontStyleString;
+    // FIX: Apply current font style to textMeasureEl to get correct size
+	var fontStyle = getComputedStyle(processFontStyle(this.font), this.element_),
+	    fontStyleString = buildStyle(fontStyle);	
+	this.textMeasureEl_.style.font = fontStyleString;
 
     // Don't use innerHTML or innerText because they allow markup/whitespace.
     this.textMeasureEl_.appendChild(doc.createTextNode(text));
@@ -1504,7 +1403,7 @@ if (!document.createElement('canvas').getContext) {
       case null:
       case '':
         this.repetition_ = 'repeat';
-        break;
+        break
       case 'repeat-x':
       case 'repeat-y':
       case 'no-repeat':
@@ -1561,9 +1460,6 @@ if (!document.createElement('canvas').getContext) {
   CanvasGradient = CanvasGradient_;
   CanvasPattern = CanvasPattern_;
   DOMException = DOMException_;
-  // Additional info for jqPlot
-  // https://bitbucket.org/cleonello/jqplot/diff/src/excanvas.js?diff1=f289920f4d4f&diff2=b233cdeb2e574e323dacd7e54eb379d20aeb3811&at=default
-  G_vmlCanvasManager._version = 888;
 })();
 
 } // if
