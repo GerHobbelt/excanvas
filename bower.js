@@ -23,6 +23,6 @@
         "test",
         "AUTHORS",
         "COPYING",
-        "README"
+        "README.md"
     ]
 }
