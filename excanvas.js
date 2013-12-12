@@ -49,7 +49,7 @@ if (!document.createElement('canvas').getContext) {
   var ms = m.sin;
   var mc = m.cos;
   var sqrt = m.sqrt;
-  var PI = Math.PI;
+  var PI = m.PI;
   var IE8_AND_LOWER = /MSIE/.test(navigator.userAgent) && !window.addEventListener;
 
   // this is used for sub pixel precision
