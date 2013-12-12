@@ -14,7 +14,7 @@
 
 // Use this conditional to import (changing excanvas.js path)
 //
-// <!--[if lte IE 8]><!-- IE8 and lower only -->
+// <!--[if lte IE 8]>
 //   <script src="excanvas.js"></script>
 // <![endif]-->
 
