@@ -686,7 +686,7 @@ if (!document.createElement('canvas').getContext) {
         ctx.textMeasureEl_.removeNode(true);
         ctx.textMeasureEl_ = null;
       }
-      ctx.element_.innerHTML = vml;
+      if(ctx.element_) ctx.element_.innerHTML = vml;
       ctx.drawScheduled_ = false;
     }
 
