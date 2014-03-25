@@ -6,7 +6,7 @@ Copyright 2006 Google Inc.
 
 Firefox, Safari and Opera 9 support the canvas tag to allow 2D command-based 
 drawing operations. ExplorerCanvas brings the same functionality to Internet 
-Explorer; web developers only need to include a single script tag in their 
+Explorer 8 and older; web developers only need to include a single script tag in their 
 existing canvas webpages to enable this support.
 
 
@@ -17,10 +17,10 @@ Place the ExplorerCanvas source file `excanvas.js` in the same directory as your
 
 ## Include the script om your HTML files
 
-The `excanvas.js` file must be included in the page before any occurrences of canvas elements in the markup. This is due to limitations in IE and we need to do our magic before IE sees any instance of `<canvas>` in the markup. It is recommended to put it in the head.
+The `excanvas.js` file must be included in the page before any occurrences of canvas elements in the markup. This is due to limitations in IE and we need to do our magic before IE sees any instance of `<canvas>` in the markup. It is recommended to put it in the head. More on "[Can I use the HTML5 canvas element?](http://caniuse.com/canvas)".
 
 	<head>
-	<!--[if IE]><script src="excanvas.js"></script><![endif]-->
+	<!--[if lte IE 8]><script src="excanvas.js"></script><![endif]-->
 	</head>
 
 
